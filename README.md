@@ -198,7 +198,122 @@ php artisan view:cache
 * Configurez un **worker de queue** si vous envoyez les e‑mails en asynchrone
 * HTTPS + en‑têtes de sécurité (CSP), logs rotatifs, backups DB
 
+---
 
+## 🧪 Commandes dev
+
+```bash
+php artisan serve                     # serveur dev
+npm run dev                           # Vite en HMR
+npm run build                         # build de prod
+php artisan migrate:fresh --seed      # reset DB + seeders
+php artisan optimize                  # optimisations caches
+```
+
+---
+
+## ☁️ Déploiement OVH (mutualisé)
+
+Deux scénarios : **avec SSH** (recommandé) ou **sans SSH** (FTP seulement).
+
+### A) Avec SSH
+
+1. **Cible web** = dossier `public/` : dans **OVH Manager > Hébergements > Multisite**, réglez le **dossier racine** sur `/www/public` (ou adaptez si vous uploadez ailleurs)
+2. Poussez le code (via Git/rsync) sur le serveur
+3. Sur le serveur :
+
+   ```bash
+   composer install --no-dev -o
+   npm ci && npm run build     # ou build local puis upload du dossier public/build
+   php artisan migrate --force
+   php artisan storage:link
+   php artisan optimize
+   ```
+
+### B) Sans SSH (FTP uniquement)
+
+**Principe :** faire les installations **en local**, puis **uploader**. Ensuite, déclencher `storage:link` via un **petit script protégé**.
+
+1. **En local** :
+
+   ```bash
+   composer install --no-dev -o
+   npm ci && npm run build
+   php artisan migrate --force   # ou export SQL et import via phpMyAdmin OVH
+   ```
+
+   * Vérifiez que `public/build/` (Vite) est présent
+   * Mettez votre **.env** de prod (avec APP_KEY) prêt
+
+2. **Upload FTP** : uploadez **tout** (sauf `.git`, `node_modules`, `tests`, etc.). Assurez-vous que la **racine du site** pointe sur le **sous-dossier `public/`**.
+
+3. **Créer le lien storage** sans SSH :
+
+   * Créez `public/link-storage.php` avec le contenu ci-dessous
+   * Ajoutez un **token** dans `.env` : `STORAGE_LINK_TOKEN=quelquechose_de_long`
+   * Ouvrez **[https://votre-domaine.tld/link-storage.php?token=quelquechose_de_long](https://votre-domaine.tld/link-storage.php?token=quelquechose_de_long)** une fois, vous devez lire `ok`. **Supprimez** le fichier ensuite.
+
+```php
+<?php
+// public/link-storage.php — à créer puis SUPPRIMER après usage
+$token = $_GET['token'] ?? '';
+if (!$token || $token !== getenv('STORAGE_LINK_TOKEN')) { http_response_code(403); exit('forbidden'); }
+
+// 1) Tente la commande artisan officielle
+try {
+    require __DIR__ . '/../vendor/autoload.php';
+    $app = require __DIR__ . '/../bootstrap/app.php';
+    $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+    $kernel->call('storage:link');
+    echo 'ok (artisan)';
+    exit;
+} catch (Throwable $e) {
+    // 2) Fallback: symlink direct (si autorisé par l’hébergeur)
+    $target = realpath(__DIR__ . '/../storage/app/public');
+    $link   = __DIR__ . '/storage';
+    if ($target && !is_link($link)) {
+        @symlink($target, $link);
+    }
+    if (is_link($link)) {
+        echo 'ok (symlink)';
+        exit;
+    }
+    http_response_code(500);
+    echo 'failed: ' . $e->getMessage();
+}
+```
+
+> Si OVH bloque `symlink()`, gardez la solution **artisan** (qui crée un lien symbolique également) — sur la plupart des offres mutualisées récentes, ça fonctionne. En dernier recours, vous pouvez exposer les fichiers via un **filesystem public** ou une **route dédiée**, mais c’est moins optimal.
+
+4. **Optimisation** (optionnel, via petit script one‑shot si pas de SSH) :
+
+   * `public/optimize.php` :
+
+```php
+<?php
+$token = $_GET['token'] ?? '';
+if (!$token || $token !== getenv('STORAGE_LINK_TOKEN')) { http_response_code(403); exit('forbidden'); }
+require __DIR__ . '/../vendor/autoload.php';
+$app = require __DIR__ . '/../bootstrap/app.php';
+$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+$kernel->call('config:cache');
+$kernel->call('route:cache');
+$kernel->call('view:cache');
+echo 'ok';
+```
+
+* Exécutez **une fois** l’URL `https://votre-domaine.tld/optimize.php?token=...`, puis **supprimez** le fichier.
+
+---
+
+## 🔐 Sécurité (rappels)
+
+* Ne laissez **jamais** `link-storage.php` / `optimize.php` en ligne après usage
+* `APP_DEBUG=false` en prod
+* Activez la **2FA** pour tous les comptes admin
+* Configurez SPF/DKIM/DMARC pour les e‑mails
+
+---
 
 ## Licence
 
