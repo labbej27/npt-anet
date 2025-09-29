@@ -1,61 +1,205 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Numérique pour Tous – Anet (Laravel)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Projet libre (Laravel + Filament) pour une association qui organise des **ateliers d’inclusion numérique** (logiciels libres) avec **réservation en ligne**.
 
-## About Laravel
+* **Ateliers** : mercredis après-midi à la **Mairie d’Anet**
+* **Créneaux** : 3 × 1h (14:00–15:00, 15:00–16:00, 16:00–17:00)
+* **Capacité** : 5 personnes / créneau
+* **Admin** : Filament (CRUD sessions, réservations, articles, pages)
+* **Réservations** : e‑mail + fichier **ICS** (invitation calendrier)
+* **2FA** : authentification à double facteur (Google Authenticator) pour l’admin
+* **Calendrier public** : FullCalendar (mois/semaine/jour, clic → réservation)
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Sommaire
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+* [Stack & prérequis](#stack--prérequis)
+* [Installation](#installation)
+* [Configuration](#configuration)
+* [Base de données & seeders](#base-de-données--seeders)
+* [Admin & 2FA](#admin--2fa)
+* [Fonctionnalités](#fonctionnalités)
+* [Scripts utiles](#scripts-utiles)
+* [Mise en production](#mise-en-production)
+* [Publier ce projet sur GitHub](#publier-ce-projet-sur-github)
+* [Licence](#licence)
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Stack & prérequis
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+* **PHP** ≥ 8.2, **Composer**
+* **Node.js** ≥ 20.19 (ou 22.12+), **npm**
+* **Base de données** : MySQL/MariaDB ou PostgreSQL
+* **Laravel** 12
+* **Filament** 3 (admin) + Breezy (profil, 2FA)
+* **Spatie Media Library** (images des articles, WebP + conversions)
+* **FullCalendar** 6 (calendrier public)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+> Conseil : utilisez **nvm** pour caler la version de Node.
 
-## Laravel Sponsors
+```bash
+nvm install 22
+nvm use 22
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+---
 
-### Premium Partners
+## Installation
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+# 1) Récupérer le projet
+git clone <votre-fork-ou-repo> anet-numerique
+cd anet-numerique
 
-## Contributing
+# 2) Dépendances PHP
+composer install
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+# 3) Environnement
+cp .env.example .env
+php artisan key:generate
+# ➜ éditez .env pour DB_*, MAIL_*, APP_* (voir section Configuration)
 
-## Code of Conduct
+# 4) Dépendances front
+npm ci
+npm run build   # ou npm run dev en local
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+# 5) Stockage public (médias)
+php artisan storage:link
 
-## Security Vulnerabilities
+# 6) Migrations & seeders
+php artisan migrate
+php artisan db:seed --class=WorkshopSeeder    # génère 12 semaines de mercredis × 3 créneaux
+php artisan db:seed --class=PageSeeder        # crée les pages: contact, mentions légales, intro asso
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+# 7) Créer un administrateur Filament
+php artisan make:filament-user
+# ➜ suivez l’assistant (email / mot de passe). L’URL admin est /admin
 
-## License
+# 8) Lancer le serveur
+php artisan serve
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+---
+
+## Configuration
+
+Dans **.env** :
+
+```env
+APP_NAME="Numérique pour Tous – Anet"
+APP_ENV=local
+APP_DEBUG=true
+APP_URL=http://127.0.0.1:8000
+APP_LOCALE=fr
+APP_FALLBACK_LOCALE=fr
+APP_TIMEZONE=Europe/Paris
+
+# Base de données
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=anet
+DB_USERNAME=anet
+DB_PASSWORD=secret
+
+# E‑mail (exemple Mailtrap)
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=your_user
+MAIL_PASSWORD=your_pass
+MAIL_ENCRYPTION=null
+MAIL_FROM_ADDRESS=contact@numerique-anet.fr
+MAIL_FROM_NAME="Numérique pour Tous – Anet"
+```
+
+---
+
+## Base de données & seeders
+
+* **`WorkshopSeeder`** : crée automatiquement 12 semaines de créneaux le mercredi (14h/15h/16h).
+* **`PageSeeder`** : crée les pages **Contact**, **Mentions légales** et un bloc **Présentation** (slug `association-intro`).
+
+Exécuter :
+
+```bash
+php artisan migrate
+php artisan db:seed --class=WorkshopSeeder
+php artisan db:seed --class=PageSeeder
+```
+
+> Vous pouvez éditer ces contenus dans l’admin Filament : **Contenus → Pages**.
+
+---
+
+## Admin & 2FA
+
+* Accès : `http://votre-domaine/admin`
+* **Création d’un admin** : `php artisan make:filament-user`
+* **2FA (Google Authenticator)** :
+
+  1. Connectez‑vous à l’admin
+  2. Ouvrez **Mon profil** (menu utilisateur)
+  3. Activez **Two-factor Authentication**
+  4. Scannez le **QR Code** dans Google Authenticator (ou Authy), entrez le code à 6 chiffres
+
+> La 2FA est gérée via **Filament Breezy**. Si vous forcez la 2FA, pensez à garder un **code de récupération**.
+
+---
+
+## Fonctionnalités
+
+* **Public**
+
+  * Page Accueil / Association
+  * **Agenda** (liste par semaine/jour)
+  * **Calendrier** (FullCalendar) : vue mois/semaine/jour, clic → modale de réservation
+  * **Réservation** : formulaire (nom, e‑mail, téléphone) → e‑mail de confirmation + **.ics**
+  * Lien d’**annulation** autonome
+  * **Articles** (couverture + galerie, carrousel avec zoom plein écran)
+
+* **Admin (Filament)**
+
+  * **Ateliers / Créneaux** (WorkshopSession)
+  * **Réservations** (liste, annulation)
+  * **Articles** (titre, contenu, images WebP, galerie)
+  * **Pages** (Contact, Mentions légales, Présentation)
+  * **Profil** (mot de passe, 2FA)
+
+---
+
+## Scripts utiles
+
+```bash
+# Dev – serveur Laravel + Vite
+composer run dev
+
+# Nettoyage caches
+php artisan optimize:clear
+
+# Regénérer les conversions médias (vignettes, webp)
+php artisan media-library:regenerate
+```
+
+---
+
+## Mise en production
+
+```bash
+php artisan migrate --force
+npm run build
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+* Configurez un **worker de queue** si vous envoyez les e‑mails en asynchrone
+* HTTPS + en‑têtes de sécurité (CSP), logs rotatifs, backups DB
+
+
+
+## Licence
+
+**MIT** — libre d’usage et de modification. Merci de citer l’association **Numérique pour Tous – Anet** si vous réutilisez ce projet.
