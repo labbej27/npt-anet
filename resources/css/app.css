@@ -1,0 +1,179 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --- Palette drapeau --- */
+:root{
+  --flag-blue:#0055A4;
+  --flag-white:#ffffff;
+  --flag-red:#EF3340;
+}
+
+/* --- Base: fond bleu + texte blanc --- */
+@layer base {
+  html, body { @apply h-full; }
+  body { @apply bg-flag-blue text-flag-white; }
+  /* Ne pas forcer tous les <a> en blanc (sinon illisible dans les cartes blanches) */
+}
+
+/* --- Composants réutilisables --- */
+@layer components {
+  /* Surfaces blanches lisibles */
+  .surface { @apply bg-white text-gray-900 rounded-lg shadow border border-white/20; }
+  .card    { @apply bg-white/95 text-gray-900 rounded-lg shadow border border-white/20; }
+
+  /* Lien de NAV (blanc sur fond bleu) */
+  .nav-link { @apply text-flag-white hover:text-flag-white/80 underline-offset-4 hover:underline; }
+
+  /* Liens à l’intérieur des surfaces blanches (bleu lisible) */
+  .surface a, #calendar a, .prose a { @apply text-blue-700 hover:text-blue-800 underline; }
+
+  /* Boutons */
+  .btn            { @apply inline-flex items-center gap-2 px-4 py-2 rounded font-medium transition; }
+  .btn-primary    { @apply btn bg-flag-red text-white hover:bg-flag-red/90; }
+  .btn-secondary  { @apply btn bg-white text-gray-900 border border-gray-300 hover:bg-gray-50; }
+  .btn-outline    { @apply btn border border-white/40 text-flag-white hover:bg-white/10; }
+
+  /* Inputs */
+  .form-label { @apply block text-sm mb-1; }
+  .form-field { @apply w-full rounded border border-gray-300 bg-white text-gray-900 px-3 py-2 placeholder-gray-400; }
+  /* Labels : blancs sur fond bleu, noirs dans une surface blanche */
+  .form-label { @apply text-flag-white/90; }
+  .surface .form-label { @apply text-gray-700; }
+
+  /* Tableaux */
+  .table-surface { @apply surface overflow-hidden; }
+  .table-surface table { @apply w-full text-sm; }
+  .table-surface thead th { @apply bg-gray-50 text-gray-700 font-semibold px-3 py-2; }
+  .table-surface tbody td { @apply border-t border-gray-100 px-3 py-2 text-gray-800; }
+
+  /* Modale <dialog> */
+  dialog { @apply surface p-0; }
+  dialog::backdrop { background-color: rgb(0 0 0 / 0.5); }
+
+  /* Calendrier (FullCalendar) – texte sombre */
+  #calendar { @apply surface p-3; }
+}
+
+/* Utilitaires palette */
+.bg-flag-blue { background-color: var(--flag-blue); }
+.bg-flag-red  { background-color: var(--flag-red); }
+.text-flag-white { color: var(--flag-white); }
+.text-flag-red   { color: var(--flag-red); }
+.border-flag-white\/20 { border-color: rgba(255,255,255,.2); }
+
+/* Typo inversée (si plugin typography) */
+.prose-invert :where(a){ color: var(--flag-red); }
+
+
+/* ---------- Galerie / Carrousel ---------- */
+.gallery {
+  --gal-h: 420px;              /* hauteur par défaut, ajustée en JS */
+  position: relative;
+  background: #0b4f8f;         /* fond bleu foncé pour éviter les bandes blanches */
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.gal-track {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  height: var(--gal-h);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  /* Masquer les barres de scroll (dots à la place) */
+  scrollbar-width: none;           /* Firefox */
+  -ms-overflow-style: none;        /* IE/Edge legacy */
+}
+.gal-track::-webkit-scrollbar { display: none; } /* WebKit */
+
+.gal-slide {
+  position: relative;
+  flex: 0 0 100%;
+  height: var(--gal-h);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  scroll-snap-align: center;
+  background: #0b4f8f;
+}
+
+.gal-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;          /* auto-zoom sans coupe, bandes latérales si portrait */
+  object-position: center;
+  display: block;
+  background: #0b4f8f;
+}
+
+/* Flèches (en dehors du visuel sur desktop) */
+.gal-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  background: rgba(255,255,255,.95);
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: .375rem;
+  padding: .5rem .625rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,.08);
+}
+.gal-prev { left: -0.75rem; }
+.gal-next { right: -0.75rem; }
+@media (max-width: 640px) {
+  .gal-prev { left: .25rem; }
+  .gal-next { right: .25rem; }
+}
+
+/* Dots */
+.gal-dots {
+  position: absolute; left:0; right:0; bottom: .25rem;
+  display: flex; gap: .375rem; justify-content: center;
+  pointer-events: none;         /* clics passent à travers sauf sur les boutons */
+}
+.gal-dot {
+  width: .5rem; height: .5rem;
+  border-radius: 9999px;
+  background: rgba(255,255,255,.35);
+  pointer-events: auto;         /* clickable */
+}
+.gal-dot.is-active { background: #fff; }
+
+/* Lightbox */
+.gal-lightbox[hidden] { display: none; }
+.gal-lightbox {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.88);
+  display: grid; place-items: center;
+  z-index: 50;
+}
+.gal-lightbox-img {
+  max-width: 92vw; max-height: 92vh;
+  object-fit: contain; object-position: center;
+  background: #0b4f8f;
+  border-radius: .5rem;
+}
+.gal-lightbox-close {
+  position: absolute; top: 1rem; right: 1rem;
+  background: rgba(255,255,255,.95);
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: .375rem;
+  padding: .5rem .75rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,.08);
+}
+
+
+.article-cover {
+  width: 100%;
+  height: 420px;
+  object-fit: cover;
+  display: block;
+}
+@media (min-width: 768px) {
+  .article-cover { height: 480px; }
+}
+
