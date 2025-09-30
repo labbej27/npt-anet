@@ -212,79 +212,99 @@ php artisan optimize                  # optimisations caches
 
 ---
 
-☁️ Déploiement OVH (mutualisé)
-A) Avec SSH
-composer install --no-dev -o
-npm ci && npm run build
-php artisan migrate --force
-php artisan storage:link
-php artisan optimize
+## ☁️ Déploiement OVH (mutualisé)
 
-B) Sans SSH (FTP uniquement)
-Étapes générales
+Deux scénarios : **avec SSH** (recommandé) ou **sans SSH** (FTP seulement).
 
-Installer et builder en local (composer, npm, migrations)
+### A) Avec SSH
 
-Uploader par FTP (sans .git, node_modules, etc.)
+1. **Cible web** = dossier `public/` : dans **OVH Manager > Hébergements > Multisite**, réglez le **dossier racine** sur `/www/public` (ou adaptez si vous uploadez ailleurs)
+2. Poussez le code (via Git/rsync) sur le serveur
+3. Sur le serveur :
 
-Créer le lien storage par l’une des deux méthodes ci-dessous
+   ```bash
+   composer install --no-dev -o
+   npm ci && npm run build     # ou build local puis upload du dossier public/build
+   php artisan migrate --force
+   php artisan storage:link
+   php artisan optimize
+   ```
 
-Méthode 1 : script sécurisé (recommandée)
+### B) Sans SSH (FTP uniquement)
 
-Créer public/link-storage.php :
+**Principe :** faire les installations **en local**, puis **uploader**. Ensuite, déclencher `storage:link` via un **petit script protégé**.
 
+1. **En local** :
+
+   ```bash
+   composer install --no-dev -o
+   npm ci && npm run build
+   php artisan migrate --force   # ou export SQL et import via phpMyAdmin OVH
+   ```
+
+   * Vérifiez que `public/build/` (Vite) est présent
+   * Mettez votre **.env** de prod (avec APP_KEY) prêt
+
+2. **Upload FTP** : uploadez **tout** (sauf `.git`, `node_modules`, `tests`, etc.). Assurez-vous que la **racine du site** pointe sur le **sous-dossier `public/`**.
+
+3. **Créer le lien storage** sans SSH :
+
+   * Créez `public/link-storage.php` avec le contenu ci-dessous
+   * Ajoutez un **token** dans `.env` : `STORAGE_LINK_TOKEN=quelquechose_de_long`
+   * Ouvrez **[https://votre-domaine.tld/link-storage.php?token=quelquechose_de_long](https://votre-domaine.tld/link-storage.php?token=quelquechose_de_long)** une fois, vous devez lire `ok`. **Supprimez** le fichier ensuite.
+
+```php
 <?php
+// public/link-storage.php — à créer puis SUPPRIMER après usage
 $token = $_GET['token'] ?? '';
 if (!$token || $token !== getenv('STORAGE_LINK_TOKEN')) { http_response_code(403); exit('forbidden'); }
 
-$target = realpath(__DIR__ . '/../storage/app/public');
-$link   = __DIR__ . '/storage';
-
-if ($target && !is_link($link)) {
-    @symlink($target, $link);
+// 1) Tente la commande artisan officielle
+try {
+    require __DIR__ . '/../vendor/autoload.php';
+    $app = require __DIR__ . '/../bootstrap/app.php';
+    $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+    $kernel->call('storage:link');
+    echo 'ok (artisan)';
+    exit;
+} catch (Throwable $e) {
+    // 2) Fallback: symlink direct (si autorisé par l’hébergeur)
+    $target = realpath(__DIR__ . '/../storage/app/public');
+    $link   = __DIR__ . '/storage';
+    if ($target && !is_link($link)) {
+        @symlink($target, $link);
+    }
+    if (is_link($link)) {
+        echo 'ok (symlink)';
+        exit;
+    }
+    http_response_code(500);
+    echo 'failed: ' . $e->getMessage();
 }
-echo is_link($link) ? 'ok' : 'failed';
+```
 
+> Si OVH bloque `symlink()`, gardez la solution **artisan** (qui crée un lien symbolique également) — sur la plupart des offres mutualisées récentes, ça fonctionne. En dernier recours, vous pouvez exposer les fichiers via un **filesystem public** ou une **route dédiée**, mais c’est moins optimal.
 
-Ajouter à .env :
+4. **Optimisation** (optionnel, via petit script one‑shot si pas de SSH) :
 
-STORAGE_LINK_TOKEN=ma_clef_longue
+   * `public/optimize.php` :
 
-
-Puis visiter une fois :
-
-https://votre-domaine.tld/link-storage.php?token=ma_clef_longue
-
-
-Supprimer ensuite le fichier.
-
-Méthode 2 : renommage index.php
-
-Créer public/link.php :
-
+```php
 <?php
-$target = '../storage/app/public';
-$link   = 'storage';
-symlink($target, $link);
+$token = $_GET['token'] ?? '';
+if (!$token || $token !== getenv('STORAGE_LINK_TOKEN')) { http_response_code(403); exit('forbidden'); }
+require __DIR__ . '/../vendor/autoload.php';
+$app = require __DIR__ . '/../bootstrap/app.php';
+$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+$kernel->call('config:cache');
+$kernel->call('route:cache');
+$kernel->call('view:cache');
+echo 'ok';
+```
 
-echo readlink($link);
-
-
-Procédure FTP :
-
-Renommer public/index.php → index.php.old
-
-Renommer public/link.php → index.php
-
-Visiter le site pour exécuter le script
-
-Restaurer les fichiers : index.php → link.php, index.php.old → index.php
-
-Résultat : le lien public/storage est créé et fonctionnel.
+* Exécutez **une fois** l’URL `https://votre-domaine.tld/optimize.php?token=...`, puis **supprimez** le fichier.
 
 ---
-
-
 
 ## 🔐 Sécurité (rappels)
 
